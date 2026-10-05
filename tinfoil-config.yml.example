@@ -1,0 +1,33 @@
+# TEMPLATE ONLY: publish and verify the exact image and measured configuration
+# before sending any runtime location. This root key is distinct from all
+# application, worker-execution, worker-bootstrap and credential authorities.
+cvm-version: "0.14.8"
+cpus: 2
+memory: 8192
+networks:
+  controller-net:
+    egress: open
+containers:
+  - name: controller
+    image: "ghcr.io/REPLACE_OWNER/confidential-browser-controller@sha256:REPLACE_DIGEST"
+    cvm_admin: true
+    entrypoint: ["/usr/local/bin/browser-controller-entrypoint"]
+    env:
+      - BROWSER_CONTROLLER_BOOTSTRAP_PUBLIC_KEY: "REPLACE_BASE64_ED25519_PUBLIC_KEY"
+    networks: [controller-net]
+    read_only: true
+    memory: 1GiB
+    pids_limit: 128
+    tmpfs:
+      /tmp: "rw,nosuid,nodev,noexec,size=64m,mode=1777"
+      /workspace: "rw,nosuid,nodev,noexec,size=64m,uid=10001,gid=10001,mode=0700"
+    restart: "no"
+    stop_timeout: 90
+shim:
+  upstream-container: controller
+  upstream-port: 8080
+  paths: ["/healthz", "/v1/controller-bootstrap", "/v1/prepare", "/v1/exec", "/v1/credential-target"]
+  tls-own-san-domain: false
+  tls-wildcard: false
+  publish-attestation: true
+  dummy-attestation: false

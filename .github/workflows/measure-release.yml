@@ -1,0 +1,37 @@
+name: Measure browser controller configuration
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+  attestations: write
+concurrency:
+  group: measured-controller-release-${{ github.ref_name }}
+  cancel-in-progress: false
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Require an immutable tag, image and public root key
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+        run: |
+          test "$REF_TYPE" = tag
+          python3 - <<'PY'
+          import base64, pathlib, re
+          text = pathlib.Path('tinfoil-config.yml').read_text()
+          assert 'PRIVATE KEY' not in text and 'REPLACE_' not in text
+          keys = re.findall(r'BROWSER_CONTROLLER_BOOTSTRAP_PUBLIC_KEY: "([A-Za-z0-9+/=]+)"', text)
+          assert len(keys) == 1 and len(base64.b64decode(keys[0], validate=True)) == 32
+          assert re.search(r'image: "ghcr.io/1patch/confidential-browser-controller@sha256:[a-f0-9]{64}"', text)
+          assert 'BROWSER_OBJECT_CONTROLLER_LOCATION' not in text and 'BROWSER_BOOTSTRAP:' not in text
+          PY
+      - uses: tinfoilsh/measure-image-action@cb61fb5c942ae2d99a9316ada725122bd52faccd
+        with:
+          config-file: ${{ github.workspace }}/tinfoil-config.yml
+          github-token: ${{ secrets.GITHUB_TOKEN }}

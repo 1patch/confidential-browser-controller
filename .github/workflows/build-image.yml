@@ -1,0 +1,40 @@
+name: Verify and publish browser controller
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+concurrency:
+  group: browser-controller-image
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Build the exact controller startup acceptance image
+        run: docker build --target acceptance -t controller-acceptance .
+      - name: Verify bootstrap, isolation, renewal and dropped privileges
+        run: |
+          sudo swapoff --all
+          test "$(wc -l < /proc/swaps)" -eq 1
+          docker run --rm --privileged --user=0:0 --read-only \
+            --memory=1g --cpus=2 --pids-limit=128 \
+            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777 \
+            --tmpfs /workspace:rw,nosuid,nodev,noexec,size=64m,uid=10001,gid=10001,mode=0700 \
+            -e SURE_BROWSER_LAUNCHER_SENTINEL=synthetic-inherited-value \
+            controller-acceptance -test.v -test.timeout=120s
+      - name: Build release image
+        run: docker build --target runtime -t "ghcr.io/$GITHUB_REPOSITORY:$GITHUB_SHA" .
+      - uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish verified image
+        run: |
+          docker push "ghcr.io/$GITHUB_REPOSITORY:$GITHUB_SHA"
+          docker inspect --format '{{json .RepoDigests}}' "ghcr.io/$GITHUB_REPOSITORY:$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
