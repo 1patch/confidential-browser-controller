@@ -106,3 +106,41 @@ passed. Independent signature verification binds the exact source/tag and hosted
 are identical to release 3. Actual read-only Tinfoil create preflight now returns
 HTTP 200, valid, and no errors. No VM or runtime enrollment was created by that
 check; release-3 hardware evidence remains the latest actual startup proof.
+
+## Initialized controller and two-user lifecycle — October 6, 2026
+
+Release 4 passed fresh hardware attestation and accepted its encrypted two-owner
+enrollment. A repository/name-restricted cloud key permitted runner reads and
+returned HTTP 403 for a different repository, billing and inference-key access.
+The broad organization administrator key remained outside the controller.
+
+The real application runtime then drove confidential Pi, attested inference and
+Chromium for two synthetic accounts concurrently. Each opened `example.com`,
+read the page and returned screenshot pixels. End-to-end times including cold
+provisioning were 104.325 and 113.010 seconds. The users received distinct VMs,
+encrypted stores and profiles. Both workers rejected foreign-owner browser and
+agent requests, and execution-key credential/drain requests: eight HTTP 403s.
+
+Without a manual drain or cloud stop, the controller checkpointed both idle
+browsers and confirmed their cloud state as stopped. Independent verification
+authenticated each complete archive and browser-session record, found the
+original Pi conversation, and found no runtime keys in either profile.
+Subsequent application requests woke the same VMs with new attested boot nonces.
+Each user recalled its own prior random continuity code exactly; neither new
+prompt contained the code, and neither turn called a tool. Wake plus recall took
+96.510 and 94.097 seconds. The normal tool catalog was present; the proof callback
+refused tool execution during recall.
+
+The first application attempts failed before browser assignment because the JS
+SDK does not accept Go's `repo@tag@digest` input. The application adapter now uses
+the supported repository form and checks the verified repository, tag, digest
+and host before requests and every SDK readiness transition. Live verification
+rejected a wrong digest and the previous tag without sending application requests.
+Earlier failed turn reservations remain intact; new conversations supplied the
+successful proof. Neither public runtime image changed for this adapter fix.
+
+These are synthetic accounts using the real application runtime, not activated
+customer accounts. Automatic credential renewal near expiry, production storage
+policy and enrollment, operational recovery, independent security review and
+100 actual simultaneous browsers remain separate gates. Current organization
+capacity is ten instances. The classifier remains a deterministic safety stub.
