@@ -65,3 +65,32 @@ attestation and attested TLS passed, a wrong release pin was rejected, unsigned
 bootstrap was denied and application routes remained closed. Runtime credentials
 and enrollment were not delivered. The empty proof VM was then stopped.
 Runtime initialization and automatic worker lifecycle remain separate gates.
+
+## Explicit Pi runtime — release 3
+
+[Release controller-proof-20261005-3](https://github.com/1patch/confidential-browser-controller/releases/tag/controller-proof-20261005-3)
+adds an explicit immutable Pi worker mode. Browser-only enrollment continues
+rejecting inference credentials. The controller image contains neither Chromium
+nor the Pi/application runtime.
+
+Image source: `4b42aeb110ca806eee4133fd18a708a35d004efc`.
+Configuration source: `76510f6d48ba4f9afbed66c6dd2f05eaacadfd62`.
+
+```
+ghcr.io/1patch/confidential-browser-controller@sha256:b9135a9d1879f6f5ec0196a1f38384340654d8aea5645a14fe14ce51323cc75c
+```
+
+The [image acceptance](https://github.com/1patch/confidential-browser-controller/actions/runs/37397610876)
+and [measurement](https://github.com/1patch/confidential-browser-controller/actions/runs/37398001199)
+workflows passed. Independent anonymous image, exact configuration, source/tag,
+hosted signing workflow and signed SNP/TDX verification matched manifest:
+
+```
+sha256:001812b7af7dce5ffda0ec55c096cfe9167bd10e4cec452d7f978cb2a6d82b57
+```
+
+The actual confidential VM accepted the correct release pin and rejected a wrong
+one. Unsigned bootstrap was denied; all application routes, including `/v1/agent`,
+remained closed. No enrollment or runtime credentials were delivered. The VM was
+stopped after verification. Initialized lifecycle and automatic maintenance
+remain unproven; a restricted provisioning key is required before enrollment.
