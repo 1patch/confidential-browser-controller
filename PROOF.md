@@ -94,3 +94,15 @@ one. Unsigned bootstrap was denied; all application routes, including `/v1/agent
 remained closed. No enrollment or runtime credentials were delivered. The VM was
 stopped after verification. Initialized lifecycle and automatic maintenance
 remain unproven; a restricted provisioning key is required before enrollment.
+
+## Standard release workflow — release 4
+
+`controller-proof-20261005-4` at source
+`d190d0137b5ff58034d94b173d5203a0a8fe28f7` adds Tinfoil's required release workflow
+layout. The [prepare job](https://github.com/1patch/confidential-browser-controller/actions/runs/37404255363)
+and [publish job](https://github.com/1patch/confidential-browser-controller/actions/runs/37404271440)
+passed. Independent signature verification binds the exact source/tag and hosted
+`tinfoil-release-publish.yml`. Image, configuration bytes and the measured manifest
+are identical to release 3. Actual read-only Tinfoil create preflight now returns
+HTTP 200, valid, and no errors. No VM or runtime enrollment was created by that
+check; release-3 hardware evidence remains the latest actual startup proof.
