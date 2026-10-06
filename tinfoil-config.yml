@@ -9,7 +9,7 @@ networks:
     egress: open
 containers:
   - name: controller
-    image: "ghcr.io/1patch/confidential-browser-controller@sha256:c659cc4c35fc8772871c1eeffa176f2b0479aa4d7630b4f5b38bcefa83f4135a"
+    image: "ghcr.io/1patch/confidential-browser-controller@sha256:c8b89ddea67319909b61104260bee3650bdf98f81d3c18a5d756af358ca559e9"
     cvm_admin: true
     entrypoint: ["/usr/local/bin/browser-controller-entrypoint"]
     env:
