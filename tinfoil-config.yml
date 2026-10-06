@@ -9,7 +9,7 @@ networks:
     egress: open
 containers:
   - name: controller
-    image: "ghcr.io/1patch/confidential-browser-controller@sha256:c8b89ddea67319909b61104260bee3650bdf98f81d3c18a5d756af358ca559e9"
+    image: "ghcr.io/1patch/confidential-browser-controller@sha256:b9135a9d1879f6f5ec0196a1f38384340654d8aea5645a14fe14ce51323cc75c"
     cvm_admin: true
     entrypoint: ["/usr/local/bin/browser-controller-entrypoint"]
     env:
@@ -26,7 +26,7 @@ containers:
 shim:
   upstream-container: controller
   upstream-port: 8080
-  paths: ["/healthz", "/v1/controller-bootstrap", "/v1/prepare", "/v1/exec", "/v1/credential-target"]
+  paths: ["/healthz", "/v1/controller-bootstrap", "/v1/prepare", "/v1/exec", "/v1/credential-target", "/v1/agent"]
   tls-own-san-domain: false
   tls-wildcard: false
   publish-attestation: true

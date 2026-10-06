@@ -26,7 +26,7 @@ containers:
 shim:
   upstream-container: controller
   upstream-port: 8080
-  paths: ["/healthz", "/v1/controller-bootstrap", "/v1/prepare", "/v1/exec", "/v1/credential-target"]
+  paths: ["/healthz", "/v1/controller-bootstrap", "/v1/prepare", "/v1/exec", "/v1/credential-target", "/v1/agent"]
   tls-own-san-domain: false
   tls-wildcard: false
   publish-attestation: true
