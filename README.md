@@ -34,3 +34,9 @@ hardware deployment: independently verify the pinned release, attested boot,
 storage, browser lifecycle and scale before activation. The 100-owner tests use
 fixtures and do not prove 100 live browsers. Storage encryption does not prevent
 an S3 administrator from rolling back authentic ciphertext.
+
+The optional `agentRuntime: true` enrollment selects a separately pinned Pi worker
+and requires an inference credential in every encrypted owner policy. Default
+enrollment remains browser-only and rejects inference keys. This controller
+image contains no Pi runtime or application adapter. Runtime selection is part
+of the immutable enrollment and cannot change during a worker restart.

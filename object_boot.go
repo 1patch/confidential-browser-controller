@@ -115,6 +115,7 @@ type ObjectBootGate struct {
 	done          chan struct{}
 	reading       chan struct{}
 	create        func(context.Context, ObjectBootstrap) (*Worker, error)
+	parse         func([]byte) (ObjectBootstrap, error)
 	bootLimit     time.Duration
 	drainClaimed  bool
 	closeFinished bool
@@ -134,7 +135,7 @@ func NewObjectBootGate(ctx context.Context, issuer ed25519.PublicKey, root, exec
 	lifetime, cancel := context.WithCancel(context.Background())
 	g := &ObjectBootGate{ctx: ctx, issuer: append(ed25519.PublicKey(nil), issuer...), lifetime: lifetime, cancel: cancel,
 		status: ObjectBootStatus{Version: 1, Nonce: base64.RawURLEncoding.EncodeToString(nonce[:]), State: "waiting"},
-		done:   make(chan struct{}), reading: make(chan struct{}, 2), bootLimit: 90 * time.Second}
+		done:   make(chan struct{}), reading: make(chan struct{}, 2), bootLimit: 90 * time.Second, parse: ParseObjectBootstrap}
 	g.create = func(ctx context.Context, c ObjectBootstrap) (*Worker, error) {
 		return NewObjectWorker(ctx, c, root, executable)
 	}
@@ -202,7 +203,11 @@ func (g *ObjectBootGate) ServeHTTP(out http.ResponseWriter, r *http.Request) {
 		deny()
 		return
 	}
-	c, err := ParseObjectBootstrap(raw)
+	if g.parse == nil {
+		deny()
+		return
+	}
+	c, err := g.parse(raw)
 	issuer := base64.StdEncoding.EncodeToString(g.issuer)
 	if err != nil || c.Browser.ExecutePublicKey == issuer || c.Browser.SecretsPublicKey == issuer || !storageLeaseUsable(c.Storage, time.Now()) {
 		deny()

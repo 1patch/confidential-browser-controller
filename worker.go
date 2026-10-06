@@ -145,8 +145,18 @@ func (w *Worker) Execute(ctx context.Context, p Principal, req ExecuteRequest) (
 }
 
 func (w *Worker) Close(ctx context.Context) error {
+	var agentErr error
 	if w.Agent != nil {
-		w.Agent.Close()
+		if w.checkpoint != nil {
+			if agent, ok := w.Agent.(interface{ Quiesce(context.Context) error }); ok {
+				agentErr = agent.Quiesce(ctx)
+			} else {
+				w.Agent.Close()
+				agentErr = ErrUncertain
+			}
+		} else {
+			w.Agent.Close()
+		}
 	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -154,9 +164,10 @@ func (w *Worker) Close(ctx context.Context) error {
 		return w.closeErr
 	}
 	w.closed = true
+	w.closeErr = agentErr
 	if w.driver != nil {
 		var session []byte
-		if w.checkpoint != nil {
+		if w.checkpoint != nil && w.closeErr == nil {
 			if source, ok := w.driver.(privateBrowserSession); ok {
 				session, w.closeErr = source.exportSession(ctx)
 			} else {

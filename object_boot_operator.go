@@ -16,8 +16,10 @@ import (
 // ObjectBootOperator runs outside the public image. Its target comes from an
 // operator's retained provisioning record, never an agent or endpoint redirect.
 type ObjectBootOperator struct {
-	Target  CredentialTarget
-	Key     ed25519.PrivateKey
+	Target CredentialTarget
+	Key    ed25519.PrivateKey
+	// Agent selects only the separately measured Pi worker input schema.
+	Agent   bool
 	connect func(string, string) (*http.Client, error) // same-package tests only
 }
 
@@ -77,7 +79,7 @@ func (o ObjectBootOperator) deliver(parent context.Context, input io.Reader, res
 	if err != nil || len(raw) == 0 || len(raw) > 64<<10 || ctx.Err() != nil {
 		return zero, ErrInvalid
 	}
-	c, err := ParseObjectBootstrap(raw)
+	c, err := parseObjectBootstrap(raw, o.Agent)
 	issuer := base64.StdEncoding.EncodeToString(o.Key.Public().(ed25519.PublicKey))
 	if err != nil || c.Browser.Owner != o.Target.Owner || c.Browser.Audience != o.Target.Audience || c.Browser.ExecutePublicKey == issuer || c.Browser.SecretsPublicKey == issuer {
 		return zero, ErrDenied

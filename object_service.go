@@ -15,13 +15,23 @@ type ObjectBootstrap struct {
 }
 
 func ParseObjectBootstrap(raw []byte) (ObjectBootstrap, error) {
+	return parseObjectBootstrap(raw, false)
+}
+
+// ParseObjectAgentBootstrap is exclusive to the separately measured Pi image.
+// Browser-only entrypoints continue to reject inference credentials.
+func ParseObjectAgentBootstrap(raw []byte) (ObjectBootstrap, error) {
+	return parseObjectBootstrap(raw, true)
+}
+
+func parseObjectBootstrap(raw []byte, agent bool) (ObjectBootstrap, error) {
 	var c ObjectBootstrap
 	if len(raw) > 64<<10 {
 		return c, ErrInvalid
 	}
 	d := json.NewDecoder(bytes.NewReader(raw))
 	d.DisallowUnknownFields()
-	if d.Decode(&c) != nil || d.Decode(new(any)) != io.EOF || c.Browser.InferenceKey != "" {
+	if d.Decode(&c) != nil || d.Decode(new(any)) != io.EOF || (c.Browser.InferenceKey != "") != agent {
 		return ObjectBootstrap{}, ErrInvalid
 	}
 	encoded, _ := json.Marshal(c.Browser)

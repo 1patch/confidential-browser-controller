@@ -52,9 +52,14 @@ type ObjectProvisioner struct {
 	connect  func(string, string) (*http.Client, error) // same-package tests only
 	issuer   StorageLeaseIssuer
 	clock    func() time.Time
+	agent    bool
 }
 
 func NewObjectProvisioner(provider *TinfoilProvider, store *SealedStore, key ed25519.PrivateKey, owners map[string]ObjectOwnerPolicy, issuers ...StorageLeaseIssuer) (*ObjectProvisioner, error) {
+	return newObjectProvisioner(provider, store, key, owners, false, issuers...)
+}
+
+func newObjectProvisioner(provider *TinfoilProvider, store *SealedStore, key ed25519.PrivateKey, owners map[string]ObjectOwnerPolicy, agent bool, issuers ...StorageLeaseIssuer) (*ObjectProvisioner, error) {
 	if provider == nil || store == nil || len(key) != ed25519.PrivateKeySize || !releasePin.MatchString(provider.Repository) || !enclaveDomain.MatchString("browser-test."+provider.DomainSuffix) || len(owners) < 1 || len(owners) > 100 {
 		return nil, ErrInvalid
 	}
@@ -62,14 +67,14 @@ func NewObjectProvisioner(provider *TinfoilProvider, store *SealedStore, key ed2
 		return nil, ErrInvalid
 	}
 	issuer := base64.StdEncoding.EncodeToString(key.Public().(ed25519.PublicKey))
-	p := &ObjectProvisioner{provider: provider, store: store, key: append(ed25519.PrivateKey(nil), key...), owners: map[string]ObjectOwnerPolicy{}, locks: map[string]*sync.Mutex{}, names: map[string]*sync.Mutex{}}
+	p := &ObjectProvisioner{provider: provider, store: store, key: append(ed25519.PrivateKey(nil), key...), owners: map[string]ObjectOwnerPolicy{}, locks: map[string]*sync.Mutex{}, names: map[string]*sync.Mutex{}, agent: agent}
 	p.clock = time.Now
 	if len(issuers) == 1 {
 		p.issuer = issuers[0]
 	}
 	buckets, credentials := map[string]bool{}, map[string]bool{}
 	for owner, config := range owners {
-		if !identifier.MatchString(owner) || config.Browser.Owner != owner || config.Browser.Audience != "" || config.Browser.StorageKey != "" || config.Browser.InferenceKey != "" || config.Browser.ExecutePublicKey == issuer || config.Browser.SecretsPublicKey == issuer || buckets[config.Storage.Bucket] || credentials[config.Storage.AccessKeyID] {
+		if !identifier.MatchString(owner) || config.Browser.Owner != owner || config.Browser.Audience != "" || config.Browser.StorageKey != "" || (config.Browser.InferenceKey != "") != agent || config.Browser.ExecutePublicKey == issuer || config.Browser.SecretsPublicKey == issuer || buckets[config.Storage.Bucket] || credentials[config.Storage.AccessKeyID] {
 			return nil, ErrDenied
 		}
 		// Clone policy slices: later mutation of caller-owned config cannot
@@ -81,7 +86,7 @@ func NewObjectProvisioner(provider *TinfoilProvider, store *SealedStore, key ed2
 		validation.Browser.Audience = "validation"
 		validation.Browser.StorageKey = base64.StdEncoding.EncodeToString(make([]byte, 32))
 		raw, _ = json.Marshal(validation)
-		_, err := ParseObjectBootstrap(raw)
+		_, err := parseObjectBootstrap(raw, agent)
 		clear(raw)
 		if err != nil {
 			return nil, ErrDenied
@@ -150,7 +155,7 @@ func (p *ObjectProvisioner) load(ctx context.Context, i Instance) (objectProvisi
 		return objectProvisionRecord{}, ErrDenied
 	}
 	data, _ := json.Marshal(record.Bootstrap)
-	_, err = ParseObjectBootstrap(data)
+	_, err = parseObjectBootstrap(data, p.agent)
 	digest := objectBootDigest(data)
 	expected := p.owners[i.Owner]
 	expected.Browser.Audience, expected.Browser.StorageKey = i.Name, record.Bootstrap.Browser.StorageKey
@@ -284,7 +289,7 @@ func (p *ObjectProvisioner) closedProfile(ctx context.Context, record objectProv
 }
 
 func (p *ObjectProvisioner) operator(i Instance) ObjectBootOperator {
-	return ObjectBootOperator{Target: CredentialTarget{Owner: i.Owner, Audience: i.Name, Domain: i.Domain, Repository: i.Repository}, Key: p.key, connect: p.connect}
+	return ObjectBootOperator{Target: CredentialTarget{Owner: i.Owner, Audience: i.Name, Domain: i.Domain, Repository: i.Repository}, Key: p.key, Agent: p.agent, connect: p.connect}
 }
 
 func (p *ObjectProvisioner) activate(ctx context.Context, i Instance) error {

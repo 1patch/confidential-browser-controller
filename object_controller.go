@@ -39,6 +39,7 @@ type ObjectControllerConfig struct {
 	Capacity            int                          `json:"capacity"`
 	IdleMinutes         int                          `json:"idleMinutes"`
 	StorageIssuer       *StorageIssuerConfig         `json:"storageIssuer,omitempty"`
+	AgentRuntime        bool                         `json:"agentRuntime,omitempty"`
 }
 
 func ParseObjectControllerLocation(raw []byte) (ObjectControllerLocation, error) {
@@ -95,7 +96,7 @@ func ParseObjectControllerConfig(raw []byte) (ObjectControllerConfig, error) {
 	}
 	// Construction validates and copies policy; it performs no cloud operation.
 	provider := &TinfoilProvider{AdminKey: c.AdminKey, Repository: c.WorkerRepository, DomainSuffix: c.DomainSuffix}
-	provisioner, err := NewObjectProvisioner(provider, &SealedStore{}, issuer, c.Owners)
+	provisioner, err := newObjectProvisioner(provider, &SealedStore{}, issuer, c.Owners, c.AgentRuntime)
 	if err != nil {
 		return ObjectControllerConfig{}, ErrDenied
 	}
@@ -238,7 +239,7 @@ func loadObjectController(ctx context.Context, location ObjectControllerLocation
 	seed, _ := base64.StdEncoding.DecodeString(c.BootstrapPrivateKey)
 	issuer := ed25519.NewKeyFromSeed(seed)
 	clear(seed)
-	provisioner, err := NewObjectProvisioner(provider, store, issuer, c.Owners, issuers...)
+	provisioner, err := newObjectProvisioner(provider, store, issuer, c.Owners, c.AgentRuntime, issuers...)
 	clear(issuer)
 	if err != nil {
 		return nil, err

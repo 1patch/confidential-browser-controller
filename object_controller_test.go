@@ -281,3 +281,49 @@ func TestObjectControllerRejectsUnknownOwnersAndWrongSigningKeys(t *testing.T) {
 		}
 	}
 }
+
+func TestObjectAgentSchemaAndEnrollmentStayExplicit(t *testing.T) {
+	c := ObjectBootstrap{Browser: testBootstrap(t, "alice"), Storage: syntheticS3Config()}
+	raw, _ := json.Marshal(c)
+	if _, e := ParseObjectAgentBootstrap(raw); e == nil {
+		t.Fatal("Pi image accepted missing inference authority")
+	}
+	c.Browser.InferenceKey = "synthetic-private-inference"
+	raw, _ = json.Marshal(c)
+	if _, e := ParseObjectBootstrap(raw); e == nil {
+		t.Fatal("browser-only input accepted Pi authority")
+	}
+	if _, e := ParseObjectAgentBootstrap(raw); e != nil {
+		t.Fatal(e)
+	}
+	f := newObjectControllerFixture(t, 2)
+	for owner, p := range f.config.Owners {
+		p.Browser.InferenceKey = c.Browser.InferenceKey
+		f.config.Owners[owner] = p
+	}
+	raw, _ = json.Marshal(f.config)
+	if _, e := ParseObjectControllerConfig(raw); e == nil {
+		t.Fatal("default controller accepted Pi keys")
+	}
+	f.config.AgentRuntime = true
+	f.digest()
+	if e := provisionObjectController(context.Background(), f.location, f.config, f.open); e != nil {
+		t.Fatal(e)
+	}
+	control, e := loadObjectController(context.Background(), f.location, f.open)
+	if e != nil || !control.provisioner.agent || !control.provisioner.operator(Instance{}).Agent {
+		t.Fatal("explicit runtime was lost", e)
+	}
+	for _, blob := range f.backing.objects {
+		if bytes.Contains(blob.data, []byte(c.Browser.InferenceKey)) {
+			t.Fatal("inference key outside encryption")
+		}
+	}
+	p := f.config.Owners["owner-1"]
+	p.Browser.InferenceKey = ""
+	f.config.Owners["owner-1"] = p
+	raw, _ = json.Marshal(f.config)
+	if _, e := ParseObjectControllerConfig(raw); e == nil {
+		t.Fatal("mixed runtime owners accepted")
+	}
+}
