@@ -29,6 +29,11 @@ administrative API. Operators must verify actual IAM boundaries and retention,
 publish immutable measured releases, and keep one controller writer.
 
 The workflows test the exact root-drop launcher before publishing an image.
+After pinning the verified image and public root key, dispatch
+`tinfoil-release.yml` with a new version on the default branch. It creates that
+immutable tag and dispatches `tinfoil-release-publish.yml` on the exact tag.
+Existing tags and uncertain requests fail without retries. Wait for the publish
+workflow's measurement and attestation before using the new release.
 `tinfoil-config.yml.example` contains invalid placeholders. Publication is not
 hardware deployment: independently verify the pinned release, attested boot,
 storage, browser lifecycle and scale before activation. The 100-owner tests use
