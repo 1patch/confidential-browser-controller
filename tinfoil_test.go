@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 )
 
 type deniedPrepare struct{ calls int }
@@ -15,6 +16,68 @@ type deniedPrepare struct{ calls int }
 func (p *deniedPrepare) Prepare(context.Context, Instance) error {
 	p.calls++
 	return ErrDenied
+}
+
+func TestBrowserBootstrapReadinessWaitsOnlyForReadOnlyAvailability(t *testing.T) {
+	domain, pin := "browser-proof.proof.containers.tinfoil.dev", "example/browser@v1@sha256:"+strings.Repeat("a", 64)
+	for _, scenario := range []string{"transient-fetch", "transient-upstream", "bad-evidence", "unexpected-status", "channel-failure", "canceled", "deadline"} {
+		t.Run(scenario, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+			defer cancel()
+			calls, reads := 0, 0
+			connect := func(gotDomain, gotPin string) (*http.Client, error) {
+				calls++
+				if gotDomain != domain || gotPin != pin {
+					t.Fatal("readiness changed attestation identity")
+				}
+				if scenario == "bad-evidence" {
+					return nil, ErrDenied
+				}
+				if scenario == "transient-fetch" && calls == 1 || scenario == "deadline" {
+					return nil, ErrUnavailable
+				}
+				if scenario == "canceled" {
+					cancel()
+				}
+				return &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+					reads++
+					if r.Method != "GET" || r.URL.String() != "https://"+domain+"/v1/bootstrap" || r.Header.Get("Authorization") != "" || r.Body != nil {
+						t.Fatal("readiness submitted authority or an effect")
+					}
+					if scenario == "channel-failure" {
+						return nil, ErrDenied
+					}
+					status := http.StatusOK
+					if scenario == "transient-upstream" && calls == 1 {
+						status = http.StatusServiceUnavailable
+					}
+					if scenario == "unexpected-status" {
+						status = http.StatusNotFound
+					}
+					return &http.Response{StatusCode: status, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(`{"state":"waiting"}`))}, nil
+				})}, nil
+			}
+			err := waitBrowserBootstrap(ctx, domain, pin, connect, time.Millisecond)
+			switch scenario {
+			case "transient-fetch", "transient-upstream":
+				if err != nil || calls != 2 || reads < 1 {
+					t.Fatal("transient startup did not recover", err, calls, reads)
+				}
+			case "deadline":
+				if err != ErrUnavailable || reads != 0 {
+					t.Fatal("availability wait escaped deadline", err)
+				}
+			case "canceled":
+				if err != ErrUnavailable || calls != 1 || reads != 0 {
+					t.Fatal("canceled verification continued", err, calls, reads)
+				}
+			default:
+				if err != ErrDenied || calls != 1 {
+					t.Fatal("invalid evidence or channel was retried", err, calls)
+				}
+			}
+		})
+	}
 }
 
 func TestTinfoilObservedVariablesAndStartedState(t *testing.T) {

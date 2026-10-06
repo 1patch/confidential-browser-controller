@@ -296,6 +296,16 @@ func (p *ObjectProvisioner) activate(ctx context.Context, i Instance) error {
 	if err = p.cloud(ctx, i, "running"); err != nil {
 		return err
 	}
+	if p.connect == nil {
+		// Readiness is separate from the one-use delivery protocol. In
+		// particular, never retry Deliver to handle an unavailable shim.
+		waiting, cancel := context.WithTimeout(ctx, BrowserStartupTimeout)
+		err = waitBrowserBootstrap(waiting, i.Domain, i.Repository, VerifiedHTTP, 2*time.Second)
+		cancel()
+		if err != nil {
+			return err
+		}
+	}
 	record, err := p.load(ctx, i)
 	if errors.Is(err, os.ErrNotExist) {
 		// Some create operations start a secretless VM immediately. Initialize

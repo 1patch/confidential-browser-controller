@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"regexp"
@@ -38,6 +39,10 @@ func VerifiedHTTP(domain, pin string) (*http.Client, error) {
 		return nil, ErrDenied
 	}
 	if _, err = secure.Verify(); err != nil {
+		var fetch *secureclient.FetchError
+		if errors.As(err, &fetch) {
+			return nil, ErrUnavailable
+		}
 		return nil, ErrDenied
 	}
 	client, err := secure.HTTPClient()
@@ -48,6 +53,58 @@ func VerifiedHTTP(domain, pin string) (*http.Client, error) {
 	client.Timeout = 45 * time.Second
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return ErrDenied }
 	return client, nil
+}
+
+// Cloud "running" can precede the public shim route. Only read-only verification
+// is retried here. Rejected evidence remains terminal; no secret, bootstrap POST
+// or browser action is sent by this readiness check.
+func waitBrowserBootstrap(ctx context.Context, domain, pin string, connect func(string, string) (*http.Client, error), delay time.Duration) error {
+	if !enclaveDomain.MatchString(domain) || !releasePin.MatchString(pin) || connect == nil || delay <= 0 {
+		return ErrInvalid
+	}
+	for {
+		if ctx.Err() != nil {
+			return ErrUnavailable
+		}
+		client, err := connect(domain, pin)
+		if ctx.Err() != nil {
+			if client != nil {
+				client.CloseIdleConnections()
+			}
+			return ErrUnavailable
+		}
+		if err == nil && client == nil {
+			return ErrDenied
+		}
+		if err == nil {
+			request, _ := http.NewRequestWithContext(ctx, http.MethodGet, "https://"+domain+"/v1/bootstrap", nil)
+			response, requestErr := client.Do(request)
+			if requestErr == nil {
+				io.Copy(io.Discard, io.LimitReader(response.Body, 2049))
+				response.Body.Close()
+				client.CloseIdleConnections()
+				if response.StatusCode == http.StatusOK {
+					return nil
+				}
+				if response.StatusCode != http.StatusServiceUnavailable && response.StatusCode != http.StatusBadGateway && response.StatusCode != http.StatusGatewayTimeout {
+					return ErrDenied
+				}
+			} else {
+				client.CloseIdleConnections()
+				// TLS/channel-binding errors are not readiness signals.
+				return ErrDenied
+			}
+		} else if !errors.Is(err, ErrUnavailable) {
+			return err
+		}
+		timer := time.NewTimer(delay)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ErrUnavailable
+		case <-timer.C:
+		}
+	}
 }
 
 type enclaveTransport struct {
