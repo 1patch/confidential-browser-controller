@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   prepare-release:
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 5
     permissions:
       contents: write
